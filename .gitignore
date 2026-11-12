@@ -1,0 +1,18 @@
+# 비밀값이 들어 있는 환경 변수 파일 (예시 파일만 올린다)
+.env
+.env.*
+!.env.example
+!.env.test.example
+
+# 의존성
+node_modules/
+
+# 로그 / OS / 에디터
+*.log
+npm-debug.log*
+.DS_Store
+.vscode/
+.idea/
+
+# 실수로 생긴 빈 파일
+EXIT

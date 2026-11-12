@@ -1,0 +1,613 @@
+{
+  "info": {
+    "name": "미래의 나에게 짬처리 API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "순서대로 실행하면 로그인 → 가입 → 편지 → 알림까지 확인할 수 있어요.\n\n카카오 로그인 인가 코드 받기: 브라우저에서 아래 주소를 열고, 로그인 후 redirect 된 주소의 code= 값을 kakaoCode 변수에 넣으세요.\nhttps://kauth.kakao.com/oauth/authorize?client_id={{kakaoRestApiKey}}&redirect_uri={{redirectUri}}&response_type=code\n\n카카오 키가 없을 때는 서버 .env 에 DEV_LOGIN_ENABLED=true 를 켜고 '개발용 로그인'을 쓰세요(운영에서는 켤 수 없음)."
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:4000/api"
+    },
+    {
+      "key": "redirectUri",
+      "value": "http://localhost:5173/oauth/kakao"
+    },
+    {
+      "key": "kakaoRestApiKey",
+      "value": ""
+    },
+    {
+      "key": "kakaoCode",
+      "value": ""
+    },
+    {
+      "key": "signupToken",
+      "value": ""
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "email",
+      "value": "me@example.com"
+    },
+    {
+      "key": "emailCode",
+      "value": ""
+    },
+    {
+      "key": "letterId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    },
+    {
+      "key": "openDate",
+      "value": "2027-10-21"
+    }
+  ],
+  "item": [
+    {
+      "name": "0. 상태",
+      "item": [
+        {
+          "name": "서버·DB 상태",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/health",
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "1. 로그인·가입",
+      "item": [
+        {
+          "name": "카카오 로그인 (인가 코드)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/kakao",
+            "description": "기존 회원이면 accessToken, 신규면 signupToken 이 자동 저장돼요.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"code\": \"{{kakaoCode}}\",\n  \"redirectUri\": \"{{redirectUri}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json().data || {};",
+                  "if (d.signupToken) pm.collectionVariables.set('signupToken', d.signupToken);",
+                  "if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "pm.test('success 필드가 true', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "개발용 로그인 (DEV_LOGIN_ENABLED=true 일 때만)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/dev-login",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"kakaoId\": \"1001\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json().data || {};",
+                  "if (d.signupToken) pm.collectionVariables.set('signupToken', d.signupToken);",
+                  "if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "pm.test('success 필드가 true', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "아이디 중복확인",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{signupToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/handle-availability?handle=jiwoo",
+            "description": ""
+          }
+        },
+        {
+          "name": "이메일 인증 코드 발송",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{signupToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/email-verifications",
+            "description": "SMTP 미설정 개발 환경에서는 서버 로그(mail.dev_outbox)에 코드가 찍혀요. emailCode 변수에 넣으세요.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "이메일 인증 코드 확인",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{signupToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/email-verifications/confirm",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"code\": \"{{emailCode}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "회원가입",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{signupToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/auth/signup",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"handle\": \"jiwoo\",\n  \"name\": \"지우\",\n  \"age\": 25,\n  \"gender\": \"female\",\n  \"email\": \"{{email}}\",\n  \"agreements\": {\n    \"terms\": true,\n    \"privacy\": true,\n    \"notification\": true\n  }\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const d = pm.response.json().data || {};",
+                  "if (d.signupToken) pm.collectionVariables.set('signupToken', d.signupToken);",
+                  "if (d.accessToken) pm.collectionVariables.set('accessToken', d.accessToken);",
+                  "pm.test('success 필드가 true', () => pm.expect(pm.response.json().success).to.eql(true));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "2. 사용자",
+      "item": [
+        {
+          "name": "내 정보",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/users/me",
+            "description": ""
+          }
+        },
+        {
+          "name": "받는 사람 아이디 확인",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/users/lookup?handle=harin",
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. 편지",
+      "item": [
+        {
+          "name": "편지 쓰기 · 나에게",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientType\": \"self\",\n  \"title\": \"1년 뒤의 나에게\",\n  \"content\": \"미뤄둔 운동, 이제 네 차례야.\",\n  \"openDate\": \"{{openDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = (pm.response.json().data || {}).letter;",
+                  "if (l) pm.collectionVariables.set('letterId', l.id);",
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "편지 쓰기 · 친구/아무나에게",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"recipientType\": \"friend\",\n  \"recipientHandle\": \"harin\",\n  \"title\": \"하린에게\",\n  \"content\": \"생일 축하해!\",\n  \"openDate\": \"{{openDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const l = (pm.response.json().data || {}).letter;",
+                  "if (l) pm.collectionVariables.set('letterId', l.id);",
+                  "pm.test('201 Created', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "받은 편지 · 공개 예정",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/received?box=sealed",
+            "description": ""
+          }
+        },
+        {
+          "name": "받은 편지 · 열람 가능",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/received?box=opened",
+            "description": ""
+          }
+        },
+        {
+          "name": "보관함 (정렬·검색·분류)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/received?box=archived&sort=saved&from=friend&q=생일",
+            "description": ""
+          }
+        },
+        {
+          "name": "보낸 편지",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/sent",
+            "description": ""
+          }
+        },
+        {
+          "name": "편지 상세",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/{{letterId}}",
+            "description": ""
+          }
+        },
+        {
+          "name": "공개 전 수정",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/{{letterId}}",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"새 제목\",\n  \"openDate\": \"{{openDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "공개 전 삭제",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/{{letterId}}",
+            "description": ""
+          }
+        },
+        {
+          "name": "답장 (공개 당일만)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/{{letterId}}/reply",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"답장이야\",\n  \"content\": \"고마워!\",\n  \"openDate\": \"{{openDate}}\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "보관 / 보관 해제",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/{{letterId}}/archive",
+            "description": "",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"archived\": true\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          }
+        },
+        {
+          "name": "받은 편지 삭제",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/letters/{{letterId}}/received",
+            "description": ""
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. 알림",
+      "item": [
+        {
+          "name": "알림 목록",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/notifications",
+            "description": ""
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const items = (pm.response.json().data || {}).items || [];",
+                  "if (items[0]) pm.collectionVariables.set('notificationId', items[0].id);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "알림 읽음",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/notifications/{{notificationId}}/read",
+            "description": ""
+          }
+        },
+        {
+          "name": "모두 읽음",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{accessToken}}"
+              }
+            ],
+            "url": "{{baseUrl}}/notifications/read-all",
+            "description": ""
+          }
+        }
+      ]
+    }
+  ]
+}
